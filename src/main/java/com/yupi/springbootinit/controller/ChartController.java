@@ -1,5 +1,7 @@
 package com.yupi.springbootinit.controller;
 
+import java.util.Date;
+
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.google.gson.Gson;
@@ -13,11 +15,14 @@ import com.yupi.springbootinit.constant.FileConstant;
 import com.yupi.springbootinit.constant.UserConstant;
 import com.yupi.springbootinit.exception.BusinessException;
 import com.yupi.springbootinit.exception.ThrowUtils;
+import com.yupi.springbootinit.manager.AiManager;
 import com.yupi.springbootinit.model.dto.chart.*;
 import com.yupi.springbootinit.model.dto.file.UploadFileRequest;
 import com.yupi.springbootinit.model.entity.Chart;
 import com.yupi.springbootinit.model.entity.User;
 import com.yupi.springbootinit.model.enums.FileUploadBizEnum;
+import com.yupi.springbootinit.model.vo.AiResponse;
+import com.yupi.springbootinit.model.vo.LoginUserVO;
 import com.yupi.springbootinit.service.ChartService;
 import com.yupi.springbootinit.service.UserService;
 import com.yupi.springbootinit.utils.ExcelUtils;
@@ -51,6 +56,9 @@ public class ChartController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private AiManager aiManager;
 
     private final static Gson GSON = new Gson();
 
@@ -225,44 +233,61 @@ public class ChartController {
      * @return
      */
     @PostMapping("/generate")
-    public BaseResponse<String> generateChartByAI(@RequestPart("file") MultipartFile multipartFile,
+    public BaseResponse<AiResponse> generateChartByAI(@RequestPart("file") MultipartFile multipartFile,
                                                   GenerateChartByAIRequest generateChartByAIRequest, HttpServletRequest request) {
         String goal = generateChartByAIRequest.getGoal();
         String name = generateChartByAIRequest.getName();
         String chartType = generateChartByAIRequest.getChartType();
-        //校验
+        // 校验
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标为空");
-        ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length()>100, ErrorCode.PARAMS_ERROR, "名称过长");
+        ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
 
+        User loginUser = userService.getLoginUser(request);
+
+        // 拼接用户输入
         StringBuilder input = new StringBuilder();
-        input.append("分析目标:").append(goal).append("\n");
+        input.append("分析需求:").append(goal).append("\n");
+        if (StringUtils.isNotBlank(chartType)) {
+            input.append("请使用").append(chartType).append("\n");
+        }
         String data = ExcelUtils.excelToCsv(multipartFile);
-        input.append("数据:").append(data).append("\n");
+        input.append("原始数据:").append(data).append("\n");
 
-        return ResultUtils.success(input.toString());
+        // 调用AI接口生成结果
+        long modelId = 1675389311459078146L;
+        String result = aiManager.doChat(modelId, input.toString());
+        String[] strings = result.split("【【【【【");
+        if (strings.length < 3) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成内容错误");
+        }
+        String genChart = strings[1].trim();
+        String genResult = strings[2].trim();
 
-//        User loginUser = userService.getLoginUser(request);
-//        // 文件目录：根据业务、用户来划分
-//        String uuid = RandomStringUtils.randomAlphanumeric(8);
-//        String filename = uuid + "-" + multipartFile.getOriginalFilename();
-//        File file = null;
-//        try {
-//
-//            return null;
-//            // 返回可访问地址
-////            return ResultUtils.success(FileConstant.COS_HOST + filepath);
-//        } catch (Exception e) {
-////            log.error("file upload error, filepath = " + filepath, e);
-//            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
-//        } finally {
-//            if (file != null) {
-//                // 删除临时文件
-//                boolean delete = file.delete();
-//                if (!delete) {
-////                    log.error("file delete error, filepath = {}", filepath);
-//                }
-//            }
-//        }
+        // 存入数据库
+        Chart chart = new Chart();
+        chart.setGoal(goal);
+        chart.setName(name);
+        chart.setChartData(data);
+        chart.setChartType(chartType);
+        chart.setGenChart(genChart);
+        chart.setGenResult(genResult);
+        chart.setStatus("");
+        chart.setExecMessage("");
+        chart.setUserId(loginUser.getId());
+        chart.setCreateTime(new Date());
+        chart.setUpdateTime(new Date());
+        chart.setIsDelete(0);
+
+        boolean saveResult = chartService.save(chart);
+        ThrowUtils.throwIf(!saveResult, ErrorCode.OPERATION_ERROR, "存入数据库失败");
+
+        // 返回结果
+        AiResponse aiResponse = new AiResponse();
+        aiResponse.setGenChart(genChart);
+        aiResponse.setGenResult(genResult);
+        aiResponse.setChartId(chart.getId());
+
+        return ResultUtils.success(aiResponse);
     }
 
     /**

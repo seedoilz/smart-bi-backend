@@ -8,6 +8,8 @@ package com.yupi.springbootinit.common;
  */
 public enum ErrorCode {
 
+
+    TOO_MANY_REQUESTS(40500, "访问过于频繁"),
     SUCCESS(0, "ok"),
     PARAMS_ERROR(40000, "请求参数错误"),
     NOT_LOGIN_ERROR(40100, "未登录"),

@@ -2,6 +2,7 @@ package com.yupi.springbootinit.controller;
 
 import java.util.Date;
 
+import cn.hutool.core.io.FileUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.google.gson.Gson;
@@ -16,6 +17,7 @@ import com.yupi.springbootinit.constant.UserConstant;
 import com.yupi.springbootinit.exception.BusinessException;
 import com.yupi.springbootinit.exception.ThrowUtils;
 import com.yupi.springbootinit.manager.AiManager;
+import com.yupi.springbootinit.manager.RedisLimiterManager;
 import com.yupi.springbootinit.model.dto.chart.*;
 import com.yupi.springbootinit.model.dto.file.UploadFileRequest;
 import com.yupi.springbootinit.model.entity.Chart;
@@ -39,6 +41,7 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.io.File;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 帖子接口
@@ -59,6 +62,9 @@ public class ChartController {
 
     @Resource
     private AiManager aiManager;
+
+    @Resource
+    private RedisLimiterManager redisLimiterManager;
 
     private final static Gson GSON = new Gson();
 
@@ -234,7 +240,7 @@ public class ChartController {
      */
     @PostMapping("/generate")
     public BaseResponse<AiResponse> generateChartByAI(@RequestPart("file") MultipartFile multipartFile,
-                                                  GenerateChartByAIRequest generateChartByAIRequest, HttpServletRequest request) {
+                                                      GenerateChartByAIRequest generateChartByAIRequest, HttpServletRequest request) {
         String goal = generateChartByAIRequest.getGoal();
         String name = generateChartByAIRequest.getName();
         String chartType = generateChartByAIRequest.getChartType();
@@ -242,7 +248,19 @@ public class ChartController {
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标为空");
         ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
 
+        // 文件大小校验
+        long fileSize = multipartFile.getSize();
+        final long TEN_MB = 1024 * 1024;
+        ThrowUtils.throwIf(fileSize > TEN_MB, ErrorCode.OPERATION_ERROR, "文件大小超过10MB");
+
+        // 文件名后缀校验
+        String fileName = multipartFile.getOriginalFilename();
+        ThrowUtils.throwIf(Objects.equals(FileUtil.getSuffix(fileName), "csv"), ErrorCode.OPERATION_ERROR, "文件后缀只能为csv");
+
         User loginUser = userService.getLoginUser(request);
+
+        // 限流
+        redisLimiterManager.doRateLimit("generateChartByAi_" + String.valueOf(loginUser.getId()));
 
         // 拼接用户输入
         StringBuilder input = new StringBuilder();

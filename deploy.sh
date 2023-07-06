@@ -1,3 +1,5 @@
+#!/bin/bash
+
 function kill_project()
 {
   project_pid=`ps aux | grep "smart_bi-0.0.1-SNAPSHOT.jar" | grep -v grep | awk 'END{print $2}'`

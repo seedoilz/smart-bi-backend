@@ -15,7 +15,6 @@ else
       echo "--------------------"
 fi
 
-
 source /etc/profile
 echo "切换路径：/var/lib/jenkins/workspace/smart_bi_backend/"
 cd /var/lib/jenkins/workspace/smart_bi_backend

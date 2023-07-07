@@ -1,6 +1,8 @@
 package com.yupi.springbootinit.service;
 
 import javax.annotation.Resource;
+
+import com.yupi.springbootinit.model.vo.LoginUserVO;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,6 +30,17 @@ public class UserServiceTest {
             userAccount = "yu";
             result = userService.userRegister(userAccount, userPassword, checkPassword);
             Assertions.assertEquals(-1, result);
+        } catch (Exception e) {
+
+        }
+    }
+
+    @Test
+    void userLogin() {
+        String userAccount = "1111";
+        String userPassword = "11111111";
+        try {
+            LoginUserVO loginUserVO = userService.userLogin(userAccount, userPassword, null);
         } catch (Exception e) {
 
         }

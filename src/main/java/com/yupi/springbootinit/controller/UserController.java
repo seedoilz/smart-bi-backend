@@ -39,7 +39,6 @@ import org.springframework.web.bind.annotation.*;
  * @from <a href="https://yupi.icu">编程导航知识星球</a>
  */
 @RestController
-@CrossOrigin
 @RequestMapping("/user")
 @Slf4j
 public class UserController {

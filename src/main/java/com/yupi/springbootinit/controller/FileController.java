@@ -27,7 +27,6 @@ import org.springframework.web.multipart.MultipartFile;
  * @from <a href="https://yupi.icu">编程导航知识星球</a>
  */
 @RestController
-@CrossOrigin
 @RequestMapping("/file")
 @Slf4j
 public class FileController {

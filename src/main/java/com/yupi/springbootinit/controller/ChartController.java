@@ -50,6 +50,7 @@ import java.util.Objects;
  * @from <a href="https://yupi.icu">编程导航知识星球</a>
  */
 @RestController
+@CrossOrigin
 @RequestMapping("/chart")
 @Slf4j
 public class ChartController {
